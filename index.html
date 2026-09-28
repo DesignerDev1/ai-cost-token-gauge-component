@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Token & Cost Analytics Gauge Dashboard Component</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            openai: '#10b981',   // Emerald
+                            anthropic: '#f59e0b',// Amber
+                            cohere: '#8b5cf6',   // Purple
+                            accent: '#3b82f6'    // Blue
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- ApexCharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased p-4 sm:p-6 lg:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <!-- Top Header / Bar -->
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-900/80 border border-slate-800 p-5 rounded-2xl backdrop-blur-md">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+                        Live Monitoring
+                    </span>
+                    <span class="text-xs text-slate-400">v2.4.0</span>
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight text-white mt-1">AI Cost & Token Consumption Gauge</h1>
+                <p class="text-sm text-slate-400">Real-time multi-provider billing transparency dashboard.</p>
+            </div>
+
+            <!-- Timeframe & Action Buttons -->
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="inline-flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-medium">
+                    <button class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">24h</button>
+                    <button class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">7d</button>
+                    <button class="px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow-sm">30d</button>
+                    <button class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">YTD</button>
+                </div>
+
+                <button onclick="resetData()" class="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    Reset
+                </button>
+                <button class="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-500/20 transition">
+                    <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                    Export CSV
+                </button>
+            </div>
+        </header>
+
+        <!-- Dynamic Simulation Control Banner -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40 border border-indigo-500/30 p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
+                    <i data-lucide="sliders" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-200">Interactive Cost Simulator</h3>
+                    <p class="text-xs text-slate-400">Drag the slider to test real-time gauge warning alerts and budget updates.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 w-full md:w-1/2">
+                <span class="text-xs font-mono text-slate-400">0%</span>
+                <input id="budgetSlider" type="range" min="50" max="650" value="382.50" step="5" class="w-full accent-blue-500 bg-slate-800 h-2 rounded-lg cursor-pointer">
+                <span class="text-xs font-mono text-slate-400">120%</span>
+            </div>
+        </div>
+
+        <!-- Metric Cards Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Metric 1 -->
+            <div class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Month Spend</p>
+                        <h2 id="totalSpendText" class="text-2xl font-bold font-mono text-white mt-1">$382.50</h2>
+                    </div>
+                    <div class="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
+                        <i data-lucide="dollar-sign" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center gap-2">
+                    <span class="text-xs font-semibold text-emerald-400 inline-flex items-center gap-0.5">
+                        <i data-lucide="trending-up" class="w-3 h-3"></i> +12.4%
+                    </span>
+                    <span class="text-xs text-slate-500">vs last month</span>
+                </div>
+            </div>
+
+            <!-- Metric 2 -->
+            <div class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Tokens Consumed</p>
+                        <h2 id="totalTokensText" class="text-2xl font-bold font-mono text-white mt-1">112.4M</h2>
+                    </div>
+                    <div class="p-2 bg-blue-500/10 rounded-xl text-blue-400">
+                        <i data-lucide="cpu" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center gap-2 text-xs text-slate-400">
+                    <span class="text-slate-200 font-mono">84.2M In</span>
+                    <span>•</span>
+                    <span class="text-slate-200 font-mono">28.2M Out</span>
+                </div>
+            </div>
+
+            <!-- Metric 3 -->
+            <div class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Prompt Cache Savings</p>
+                        <h2 class="text-2xl font-bold font-mono text-emerald-400 mt-1">$142.10</h2>
+                    </div>
+                    <div class="p-2 bg-purple-500/10 rounded-xl text-purple-400">
+                        <i data-lucide="zap" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center gap-2 text-xs text-slate-400">
+                    <span class="text-emerald-400 font-medium">37.1% cost saved</span>
+                    <span>via cache hits</span>
+                </div>
+            </div>
+
+            <!-- Metric 4 -->
+            <div class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Monthly Projection</p>
+                        <h2 id="projectedCostText" class="text-2xl font-bold font-mono text-white mt-1">$465.00</h2>
+                    </div>
+                    <div class="p-2 bg-amber-500/10 rounded-xl text-amber-400">
+                        <i data-lucide="calculator" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center gap-2 text-xs">
+                    <span id="budgetStatusBadge" class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                        Within Budget ($500)
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Section: Gauge + Chart -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Budget Gauge Card -->
+            <div class="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl flex flex-col justify-between relative overflow-hidden">
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                            <i data-lucide="gauge" class="w-4 h-4 text-blue-400"></i>
+                            Budget Utilization Gauge
+                        </h3>
+                        <span id="budgetPercentText" class="text-xs font-mono font-bold px-2 py-1 bg-slate-800 rounded-md text-blue-400">76.5%</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Current spend against monthly limit cap of <strong class="text-slate-200 font-mono">$500.00</strong>.</p>
+                </div>
+
+                <!-- Radial Gauge Chart Container -->
+                <div class="relative my-4 flex items-center justify-center">
+                    <div id="radialGaugeChart" class="w-full max-w-[280px]"></div>
+                </div>
+
+                <!-- Gauge Footer Breakdown -->
+                <div class="bg-slate-950/60 rounded-xl p-3 border border-slate-800/80 grid grid-cols-2 gap-2 text-center">
+                    <div class="border-r border-slate-800 pr-2">
+                        <span class="text-[10px] uppercase text-slate-500 block font-semibold">Remaining Limit</span>
+                        <span id="remainingBudgetText" class="text-sm font-mono font-bold text-slate-200">$117.50</span>
+                    </div>
+                    <div class="pl-2">
+                        <span class="text-[10px] uppercase text-slate-500 block font-semibold">Hard Limit Alert</span>
+                        <span class="text-sm font-mono font-bold text-amber-400">85% ($425)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stacked Provider Daily Breakdown Chart -->
+            <div class="lg:col-span-2 bg-slate-900/80 border border-slate-800 p-6 rounded-2xl flex flex-col justify-between">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                    <div>
+                        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                            <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-400"></i>
+                            Daily Spend by Provider
+                        </h3>
+                        <p class="text-xs text-slate-400">Multi-API cost breakdown over the last 14 days.</p>
+                    </div>
+
+                    <!-- Custom Chart Legend Filter -->
+                    <div class="flex items-center gap-3 text-xs">
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> OpenAI</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Anthropic</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Cohere</span>
+                    </div>
+                </div>
+
+                <!-- Daily Bar Chart Container -->
+                <div id="dailyCostChart" class="w-full h-[280px]"></div>
+            </div>
+        </div>
+
+        <!-- Provider Matrix & Pricing Table -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden">
+            <div class="p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                        <i data-lucide="layers" class="w-4 h-4 text-purple-400"></i>
+                        Model & Token Consumption Matrix
+                    </h3>
+                    <p class="text-xs text-slate-400">Detailed pricing and usage stats per connected LLM model.</p>
+                </div>
+                <div class="relative">
+                    <input type="text" placeholder="Filter models..." class="bg-slate-950 border border-slate-800 text-xs rounded-xl pl-8 pr-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 w-full sm:w-48">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5"></i>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead class="bg-slate-950/60 text-slate-400 uppercase tracking-wider font-mono">
+                        <tr>
+                            <th class="py-3 px-5 border-b border-slate-800">Provider & Model</th>
+                            <th class="py-3 px-5 border-b border-slate-800">Input Tokens</th>
+                            <th class="py-3 px-5 border-b border-slate-800">Output Tokens</th>
+                            <th class="py-3 px-5 border-b border-slate-800">Prompt Cache Hit</th>
+                            <th class="py-3 px-5 border-b border-slate-800">Rate / 1M Tokens</th>
+                            <th class="py-3 px-5 border-b border-slate-800">Total Spend</th>
+                            <th class="py-3 px-5 border-b border-slate-800 text-right">Share</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60 text-slate-300 font-mono">
+                        <!-- Row 1: OpenAI GPT-4o -->
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="py-3.5 px-5 font-sans font-medium text-white flex items-center gap-2.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                <div>
+                                    <div class="font-semibold">GPT-4o</div>
+                                    <div class="text-[10px] text-slate-500 font-mono">OpenAI API</div>
+                                </div>
+                            </td>
+                            <td class="py-3.5 px-5">42,150,000</td>
+                            <td class="py-3.5 px-5">12,400,000</td>
+                            <td class="py-3.5 px-5 text-emerald-400">68%</td>
+                            <td class="py-3.5 px-5 text-slate-400">$2.50 / $10.00</td>
+                            <td class="py-3.5 px-5 text-white font-bold">$229.375</td>
+                            <td class="py-3.5 px-5 text-right font-sans">
+                                <span class="inline-block w-12 bg-slate-800 rounded-full h-1.5 overflow-hidden mr-2">
+                                    <span class="bg-emerald-400 h-full block" style="width: 60%"></span>
+                                </span>
+                                60%
+                            </td>
+                        </tr>
+
+                        <!-- Row 2: Anthropic Claude 3.5 Sonnet -->
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="py-3.5 px-5 font-sans font-medium text-white flex items-center gap-2.5">
+                                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                <div>
+                                    <div class="font-semibold">Claude 3.5 Sonnet</div>
+                                    <div class="text-[10px] text-slate-500 font-mono">Anthropic API</div>
+                                </div>
+                            </td>
+                            <td class="py-3.5 px-5">28,300,000</td>
+                            <td class="py-3.5 px-5">11,100,000</td>
+                            <td class="py-3.5 px-5 text-emerald-400">45%</td>
+                            <td class="py-3.5 px-5 text-slate-400">$3.00 / $15.00</td>
+                            <td class="py-3.5 px-5 text-white font-bold">$115.350</td>
+                            <td class="py-3.5 px-5 text-right font-sans">
+                                <span class="inline-block w-12 bg-slate-800 rounded-full h-1.5 overflow-hidden mr-2">
+                                    <span class="bg-amber-400 h-full block" style="width: 30%"></span>
+                                </span>
+                                30%
+                            </td>
+                        </tr>
+
+                        <!-- Row 3: Cohere Command R+ -->
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="py-3.5 px-5 font-sans font-medium text-white flex items-center gap-2.5">
+                                <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                                <div>
+                                    <div class="font-semibold">Command R+</div>
+                                    <div class="text-[10px] text-slate-500 font-mono">Cohere API</div>
+                                </div>
+                            </td>
+                            <td class="py-3.5 px-5">13,750,000</td>
+                            <td class="py-3.5 px-5">4,700,000</td>
+                            <td class="py-3.5 px-5 text-slate-500">N/A</td>
+                            <td class="py-3.5 px-5 text-slate-400">$2.50 / $10.00</td>
+                            <td class="py-3.5 px-5 text-white font-bold">$37.775</td>
+                            <td class="py-3.5 px-5 text-right font-sans">
+                                <span class="inline-block w-12 bg-slate-800 rounded-full h-1.5 overflow-hidden mr-2">
+                                    <span class="bg-purple-400 h-full block" style="width: 10%"></span>
+                                </span>
+                                10%
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Footer / Credits -->
+        <footer class="text-center text-xs text-slate-500 pt-4 border-t border-slate-900 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <p>Ready-to-use Developer UI Component • Compatible with React, Vue, Next.js, and HTML</p>
+            <p class="font-mono">AI-Cost-Gauge-v2.4.0</p>
+        </footer>
+
+    </div>
+
+    <!-- JavaScript Charts & Interactivity Logic -->
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Monthly Limit Base Cap
+        const BUDGET_LIMIT = 500.00;
+
+        // 1. Radial Gauge Chart Initialization
+        const radialGaugeOptions = {
+            series: [76.5],
+            chart: {
+                type: 'radialBar',
+                height: 280,
+                sparkline: { enabled: true }
+            },
+            plotOptions: {
+                radialBar: {
+                    startAngle: -135,
+                    endAngle: 135,
+                    hollow: {
+                        margin: 0,
+                        size: '70%',
+                        background: 'transparent',
+                    },
+                    track: {
+                        background: '#1e293b',
+                        strokeWidth: '100%',
+                        margin: 0,
+                    },
+                    dataLabels: {
+                        show: true,
+                        name: {
+                            offsetY: -10,
+                            color: '#94a3b8',
+                            fontSize: '12px',
+                            fontFamily: 'Inter',
+                        },
+                        value: {
+                            offsetY: 5,
+                            color: '#ffffff',
+                            fontSize: '28px',
+                            fontFamily: 'JetBrains Mono',
+                            fontWeight: '700',
+                            formatter: function (val) {
+                                return val + "%";
+                            }
+                        }
+                    }
+                }
+            },
+            fill: {
+                type: 'gradient',
+                gradient: {
+                    shade: 'dark',
+                    type: 'horizontal',
+                    shadeIntensity: 0.5,
+                    gradientToColors: ['#3b82f6'],
+                    inverseColors: true,
+                    opacityFrom: 1,
+                    opacityTo: 1,
+                    stops: [0, 100]
+                }
+            },
+            stroke: { lineCap: 'round' },
+            colors: ['#10b981'],
+            labels: ['Budget Used'],
+        };
+
+        const radialGaugeChart = new ApexCharts(document.querySelector("#radialGaugeChart"), radialGaugeOptions);
+        radialGaugeChart.render();
+
+
+        // 2. Daily Stacked Bar Chart Initialization
+        const dailyChartOptions = {
+            series: [{
+                name: 'OpenAI',
+                data: [12, 14, 18, 15, 22, 19, 25, 21, 28, 24, 30, 26, 32, 29]
+            }, {
+                name: 'Anthropic',
+                data: [8, 9, 11, 10, 14, 12, 15, 13, 16, 14, 18, 15, 19, 17]
+            }, {
+                name: 'Cohere',
+                data: [2, 3, 4, 3, 5, 4, 6, 5, 6, 5, 7, 6, 8, 7]
+            }],
+            chart: {
+                type: 'bar',
+                height: 250,
+                stacked: true,
+                toolbar: { show: false },
+                zoom: { enabled: false },
+                fontFamily: 'Inter'
+            },
+            colors: ['#10b981', '#f59e0b', '#8b5cf6'],
+            plotOptions: {
+                bar: {
+                    horizontal: false,
+                    borderRadius: 4,
+                    columnWidth: '45%',
+                },
+            },
+            xaxis: {
+                categories: ['14d ago', '13d', '12d', '11d', '10d', '9d', '8d', '7d', '6d', '5d', '4d', '3d', '2d', 'Today'],
+                axisBorder: { show: false },
+                axisTicks: { show: false },
+                labels: { style: { colors: '#64748b', fontSize: '11px' } }
+            },
+            yaxis: {
+                labels: {
+                    style: { colors: '#64748b', fontSize: '11px' },
+                    formatter: (val) => "$" + val
+                }
+            },
+            grid: {
+                borderColor: '#1e293b',
+                strokeDashArray: 4,
+            },
+            legend: { show: false },
+            dataLabels: { enabled: false },
+            tooltip: {
+                theme: 'dark',
+                y: { formatter: (val) => "$" + val.toFixed(2) }
+            }
+        };
+
+        const dailyCostChart = new ApexCharts(document.querySelector("#dailyCostChart"), dailyChartOptions);
+        dailyCostChart.render();
+
+
+        // 3. Interactive Slider Real-time Controller
+        const budgetSlider = document.getElementById('budgetSlider');
+        const totalSpendText = document.getElementById('totalSpendText');
+        const budgetPercentText = document.getElementById('budgetPercentText');
+        const remainingBudgetText = document.getElementById('remainingBudgetText');
+        const projectedCostText = document.getElementById('projectedCostText');
+        const budgetStatusBadge = document.getElementById('budgetStatusBadge');
+
+        budgetSlider.addEventListener('input', function(e) {
+            const spend = parseFloat(e.target.value);
+            const percentage = ((spend / BUDGET_LIMIT) * 100).toFixed(1);
+            const remaining = (BUDGET_LIMIT - spend).toFixed(2);
+            const projection = (spend * 1.21).toFixed(2);
+
+            // Update Text UI
+            totalSpendText.textContent = `$${spend.toFixed(2)}`;
+            budgetPercentText.textContent = `${percentage}%`;
+            projectedCostText.textContent = `$${projection}`;
+
+            if (remaining >= 0) {
+                remainingBudgetText.textContent = `$${remaining}`;
+                remainingBudgetText.className = "text-sm font-mono font-bold text-slate-200";
+            } else {
+                remainingBudgetText.textContent = `-$${Math.abs(remaining).toFixed(2)}`;
+                remainingBudgetText.className = "text-sm font-mono font-bold text-rose-500";
+            }
+
+            // Update Gauge Chart Series
+            radialGaugeChart.updateSeries([Math.min(percentage, 100)]);
+
+            // Status Badge & Color Rules based on Spend Threshold
+            if (percentage >= 90) {
+                budgetStatusBadge.textContent = "Over Capacity Alert!";
+                budgetStatusBadge.className = "px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium animate-pulse";
+            } else if (percentage >= 75) {
+                budgetStatusBadge.textContent = "Warning: Approaching Cap";
+                budgetStatusBadge.className = "px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium";
+            } else {
+                budgetStatusBadge.textContent = `Within Budget ($${BUDGET_LIMIT})`;
+                budgetStatusBadge.className = "px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium";
+            }
+        });
+
+        // Reset Button Functionality
+        function resetData() {
+            budgetSlider.value = 382.50;
+            budgetSlider.dispatchEvent(new Event('input'));
+        }
+    </script>
+</body>
+</html>
